@@ -48,6 +48,12 @@ ul { margin:6px 0 0; padding-left:18px; } li { margin:3px 0; }
     <div class="sub" style="margin-top:8px">Asli prop account par karna ho to: London 07:00 (Poland 08:00) ke baad dono pending order lagao (OCO): ek Buy Stop, ek Sell Stop. Ek lag jaaye to doosra cancel. 10:00 London tak koi na lage to dono cancel. 16:00 London par jo khula ho band karo. Din mein sirf 1 trade.</div>
   </div>
 
+  <div class="card" style="margin-top:12px">
+    <h2>Gold chart (PAXG 5m, live) · Vela by LuxAlgo</h2>
+    <div id="vchart" style="height:460px"></div>
+    <div class="sub" style="margin-top:6px">Hari line = Buy Stop/TP, laal line = Sell Stop/TP. Chart: <a href="https://github.com/LuxAlgo/Vela" style="color:var(--b)">Vela</a> (Apache-2.0).</div>
+  </div>
+
   <div class="grid">
     <div class="card"><h2>Live nateeja (is attempt mein)</h2><div class="big" id="wr">-</div><div class="sub" id="wrtxt"></div></div>
     <div class="card"><h2>Trading days (min 3/phase)</h2><div class="big" id="days">-</div><div class="sub">Sirf woh din gine jaate hain jab trade khula.</div></div>
@@ -83,6 +89,7 @@ ul { margin:6px 0 0; padding-left:18px; } li { margin:3px 0; }
   </div>
   <div class="sub" style="margin:12px 0">Attempt 1, shuru: <span id="sd"></span>. Page har 60 second mein khud update hota hai.</div>
 </main>
+<script src="https://cdn.jsdelivr.net/npm/@luxalgo/vela@0.10.7/dist/vela.global.min.js"></script>
 <script>
 const START = '2026-11-23', SIZE = 5000, RISK = 0.01, MAX_RISK = 0.02, COST = 0.30, LEV = 50;
 const RULES = { p1: 0.08, p2: 0.05, daily: 0.04, total: 0.10, minDays: 3, payout: 0.80 };
@@ -217,14 +224,47 @@ function render({acct: a, trades, today: t, stats: st}) {
   $('phaselog').textContent = a.phaseLog.join(' · ');
   $('sd').textContent = START;
 }
+// Vela chart: optional, the desk keeps working if the CDN or chart fails.
+let vchart = null, vready = null, vlines = [], vkey = '';
+function initChart() {
+  try {
+    const V = window.Vela;
+    vchart = new V.Vela('#vchart', {symbol: 'binance:PAXGUSDT', timeframe: '5', live: true, theme: 'dark', drawings: false});
+    vchart.data.registerProvider('binance', new V.BinanceProvider());
+    vready = vchart.ready();
+  } catch (e) { $('vchart').innerHTML = '<div class="sub">Chart load nahi hua (desk phir bhi chal raha hai).</div>'; vchart = null; }
+}
+async function drawPlan(t) {
+  if (!vchart || !t || !t.hi) return;
+  const key = `${t.date}|${t.hi}|${t.lo}`;
+  if (key === vkey) return;
+  try {
+    await vready;
+    const d = vchart.drawings, at = Date.now();
+    vlines.forEach(id => d.remove(id)); vlines = [];
+    const line = (price, color, label, style = 'solid') => {
+      const x = d.add('hline', {anchors: [{time: at, price}], style: {lineColor: color, lineWidth: 1, lineStyle: style},
+        text: {value: `${label} ${price}`, size: 'normal', hAlign: 'right', vAlign: 'top'}});
+      if (x) vlines.push(x.id);
+    };
+    line(t.buy_stop, '#22c55e', 'BUY STOP');
+    line(t.sell_stop, '#ef4444', 'SELL STOP');
+    line(t.buy_tp, '#22c55e', 'BUY TP', 'dashed');
+    line(t.sell_tp, '#ef4444', 'SELL TP', 'dashed');
+    vkey = key;
+  } catch (e) { /* chart lines are a convenience only */ }
+}
 async function tick() {
   try {
     await loadBars();
-    render(replay());
+    const res = replay();
+    render(res);
+    drawPlan(res.today);
     $('live').textContent = '· update ' + new Date().toLocaleTimeString();
   } catch (e) { $('live').textContent = '· Binance se data nahi mila, 1 minute mein dobara koshish'; }
   setTimeout(tick, 60000);
 }
+initChart();
 tick();
 </script>
 </body>
