@@ -244,7 +244,7 @@ async function drawPlan(t) {
     vlines.forEach(id => d.remove(id)); vlines = [];
     const line = (price, color, label, style = 'solid') => {
       const x = d.add('hline', {anchors: [{time: at, price}], style: {lineColor: color, lineWidth: 1, lineStyle: style},
-        text: {value: `${label} ${price}`, size: 'normal', hAlign: 'right', vAlign: 'top'}});
+        text: {value: `${label} ${price}`, size: 'normal', hAlign: 'left', vAlign: 'top'}});
       if (x) vlines.push(x.id);
     };
     line(t.buy_stop, '#22c55e', 'BUY STOP');
